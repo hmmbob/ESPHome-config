@@ -1,0 +1,48 @@
+substitutions:
+  devicename: weerhuisje
+  upper_devicename: Weerhuisje
+
+esphome:
+  name: $devicename
+  platform: ESP8266
+  board: nodemcuv2
+
+wifi:
+  manual_ip:
+    static_ip: !secret wifi_static_ip_weerhuisje
+
+# General settings: captive portal, logger, api, ota, time, restart switch, wifi
+# General sensors: status, uptime, version, wifi info
+packages:
+  general_settings: !include general_settings.yaml
+  general_sensors: !include general_sensors.yaml
+
+# Enable UART for SDS011
+uart:
+  rx_pin: D1
+  tx_pin: D2
+  baud_rate: 9600
+
+# Enable i2c for BME280
+i2c:
+  sda: D5
+  scl: D6
+  scan: true
+
+sensor:
+  - platform: sds011
+    pm_2_5:
+      name: "Particulate Matter <2.5µm Concentration"
+    pm_10_0:
+      name: "Particulate Matter <10.0µm Concentration"
+    update_interval: 20min
+
+  - platform: bme280
+    update_interval: 120s
+    address: 0x76
+    temperature:
+      name: "BME280 Temperature"
+    pressure:
+      name: "BME280 Pressure"
+    humidity:
+      name: "BME280 Humidity"

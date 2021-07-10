@@ -1,0 +1,13 @@
+version: "3"
+
+services:
+  esphome:
+    container_name: esphome
+    image: esphome/esphome:1.17.2
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Amsterdam
+    network_mode: "host"
+    volumes:
+      - /home/bob/docker/smarthome/esphome:/config
+      - /etc/localtime:/etc/localtime:ro

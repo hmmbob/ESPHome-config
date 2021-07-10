@@ -1,0 +1,49 @@
+substitutions:
+  devicename: zwembad
+  upper_devicename: Zwembad
+
+esphome:
+  name: $devicename
+  platform: ESP8266
+  board: esp01_1m
+
+wifi:
+  manual_ip:
+    static_ip: !secret wifi_static_ip_zwembad
+
+# General settings: captive portal, logger, api, ota, time, restart switch, wifi
+# General sensors: status, uptime, version, wifi info
+packages:
+  general_settings: !include general_settings.yaml
+  general_sensors: !include general_sensors.yaml
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO0
+      mode: INPUT_PULLUP
+      inverted: True
+    name: ${upper_devicename} Button
+    on_press:
+      - switch.toggle: relay
+
+switch:
+  - platform: gpio
+    name: ${upper_devicename}
+    pin: GPIO12
+    restore_mode: RESTORE_DEFAULT_OFF
+    id: relay
+
+output:
+  # Register the green LED as a dimmable output ....
+  - platform: esp8266_pwm
+    id: s20_green_led
+    pin:
+      number: GPIO13
+      inverted: True
+
+light:
+  # ... and then make a light out of it.
+  - platform: monochromatic
+    name: ${upper_devicename} Green LED
+    output: s20_green_led

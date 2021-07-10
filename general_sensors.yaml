@@ -1,0 +1,22 @@
+binary_sensor:
+  - platform: status
+    name: ${upper_devicename} Status
+
+sensor:
+  - platform: uptime
+    name: ${upper_devicename} uptime
+    update_interval: 300s
+  - platform: wifi_signal
+    name: ${upper_devicename} WiFi signaal
+    update_interval: 300s
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: ${upper_devicename} IP Address
+    ssid:
+      name: ${upper_devicename} Connected SSID
+    bssid:
+      name: ${upper_devicename} Connected BSSID
+  - platform: version
+    name: ${upper_devicename} Version
