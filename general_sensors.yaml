@@ -18,5 +18,7 @@ text_sensor:
       name: ${upper_devicename} Connected SSID
     bssid:
       name: ${upper_devicename} Connected BSSID
+    mac_address:
+      name: ${upper_devicename} Mac Address
   - platform: version
     name: ${upper_devicename} Version

@@ -31,7 +31,7 @@ switch:
   - platform: gpio
     name: "${upper_devicename}"
     pin: GPIO12
-    restore_mode: RESTORE_DEFAULT_ON
+    restore_mode: RESTORE_DEFAULT_OFF
     id: relay
 
 output:
@@ -47,3 +47,8 @@ light:
   - platform: monochromatic
     name: "${upper_devicename} Green LED"
     output: s20_green_led
+
+text_sensor:
+  - platform: wifi_info
+    scan_results:
+      name: ${upper_devicename} Scan Results

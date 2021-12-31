@@ -24,6 +24,6 @@ time:
     id: homeassistant_time
     timezone: Europe/Amsterdam
 
-switch:
+button:
   - platform: restart
     name: ${upper_devicename} Restart

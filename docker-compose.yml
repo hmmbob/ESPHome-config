@@ -3,10 +3,12 @@ version: "3"
 services:
   esphome:
     container_name: esphome
-    image: esphome/esphome:1.17.2
+    #    image: esphome/esphome:1.17.2 # Voor staande lamp
+    image: esphome/esphome
     restart: unless-stopped
     environment:
       - TZ=Europe/Amsterdam
+      - ESPHOME_DASHBOARD_USE_PING=true
     network_mode: "host"
     volumes:
       - /home/bob/docker/smarthome/esphome:/config
