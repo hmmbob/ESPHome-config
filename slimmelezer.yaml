@@ -182,8 +182,10 @@ interval:
     then:
       - http_request.post:
           url: !secret dsmr_reader_url
+          # url: http://x.x.x.x/api/v2/datalogger/dsmrreading
           headers:
             Authorization: !secret dsmr_reader_token
+            # Authorization: Token ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890
             Content-Type: application/json
           verify_ssl: false
           json: |-
