@@ -1,6 +1,6 @@
 substitutions:
-  devicename: keuken
-  upper_devicename: Keuken
+  devicename: kast
+  upper_devicename: Kast
 
 esphome:
   name: $devicename
