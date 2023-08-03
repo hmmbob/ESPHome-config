@@ -1,9 +1,13 @@
 substitutions:
   devicename: weerhuisje
-  upper_devicename: Weerhuisje
+  friendly_name: Weerhuisje
+  device_description: Zelfgebouwd weerhuisje in onze achtertuin
 
+################ Generics ################
 esphome:
   name: $devicename
+  friendly_name: ${friendly_name}
+  comment: "${device_description}"
   platform: ESP8266
   board: nodemcuv2
 
@@ -17,6 +21,7 @@ packages:
   general_settings: !include general_settings.yaml
   general_sensors: !include general_sensors.yaml
 
+################ Components ################
 # Enable UART for SDS011
 uart:
   rx_pin: D1
@@ -29,6 +34,7 @@ i2c:
   scl: D6
   scan: true
 
+################ Sensors ################
 sensor:
   - platform: sds011
     pm_2_5:
@@ -41,13 +47,8 @@ sensor:
     update_interval: 120s
     address: 0x76
     temperature:
-      name: "BME280 Temperature"
+      name: "Temperature"
     pressure:
-      name: "BME280 Pressure"
+      name: "Pressure"
     humidity:
-      name: "BME280 Humidity"
-
-text_sensor:
-  - platform: wifi_info
-    scan_results:
-      name: ${upper_devicename} Scan Results
+      name: "Humidity"

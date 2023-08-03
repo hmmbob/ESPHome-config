@@ -1,0 +1,39 @@
+substitutions:
+  name: bt-proxy-1st-floor
+  friendly_name: BT Proxy 1st floor
+  device_description: Bluetooth proxy op de 1e verdieping
+
+################ Generics ################
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  comment: "${device_description}"
+  project:
+    name: esphome.bluetooth-proxy
+    version: "1.0"
+
+esp32:
+  board: m5stack-atom
+  framework:
+    type: esp-idf
+
+wifi:
+  manual_ip:
+    static_ip: !secret wifi_static_ip_bt_proxy_1
+
+# General settings: captive portal, logger, api, ota, time, restart switch, wifi
+# General sensors: status, uptime, version, wifi info etc
+packages:
+  general_settings: !include general_settings.yaml
+  general_sensors: !include general_sensors.yaml
+
+################ Components ################
+esp32_ble_tracker:
+  scan_parameters:
+    # We currently use the defaults to ensure Bluetooth
+    # can co-exist with WiFi In the future we may be able to
+    # enable the built-in coexistence logic in ESP-IDF
+    active: true
+
+bluetooth_proxy:
+  active: true

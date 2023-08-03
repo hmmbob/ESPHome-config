@@ -1,26 +1,26 @@
 substitutions:
   devicename: slimmelezer
-  upper_devicename: Slimme Lezer
+  friendly_name: Slimme Lezer
   device_description: "DIY P1 module to read your smart meter"
 
 ################ Generics ################
 esphome:
   name: ${devicename}
+  friendly_name: ${friendly_name}
   comment: "${device_description}"
   platform: ESP8266
   board: d1_mini
   esp8266_restore_from_flash: true
-  name_add_mac_suffix: false
 
 wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
   manual_ip:
-    gateway: !secret wifi_gateway
-    subnet: !secret wifi_subnet
     static_ip: !secret wifi_static_ip_p1reader
 
-api:
+# General settings: captive portal, logger, api, ota, time, restart switch, wifi
+# General sensors: status, uptime, version, wifi info etc
+packages:
+  general_settings: !include general_settings.yaml
+  general_sensors: !include general_sensors.yaml
 
 logger:
   # Must be 0 to disable the serial logging. This cannot work
@@ -28,15 +28,7 @@ logger:
   baud_rate: 0
   level: info
 
-ota:
-
-time:
-  - platform: homeassistant
-    id: homeassistant_time
-    timezone: Europe/Amsterdam
-
 web_server:
-  port: 80
 
 ################ Components ################
 dsmr:
@@ -52,36 +44,28 @@ uart:
     rx_pin: D7
 
 ################ Sensors ################
-binary_sensor:
-  - platform: status
-    name: ${upper_devicename} Status
-
-button:
-  - platform: restart
-    name: ${upper_devicename} Restart
-
 sensor:
-  - platform: uptime
-    name: ${upper_devicename} uptime
-    update_interval: 300s
-
   - platform: dsmr
     energy_delivered_tariff1:
       id: dsmr_electricity_delivered_1
       name: "Energy Consumed Tariff 1"
       state_class: total_increasing
+      internal: true
     energy_returned_tariff1:
       id: dsmr_electricity_returned_1
       name: "Energy Produced Tariff 1"
       state_class: total_increasing
+      internal: true
     energy_delivered_tariff2:
       id: dsmr_electricity_delivered_2
       name: "Energy Consumed Tariff 2"
       state_class: total_increasing
+      internal: true
     energy_returned_tariff2:
       id: dsmr_electricity_returned_2
       name: "Energy Produced Tariff 2"
       state_class: total_increasing
+      internal: true
     power_delivered:
       accuracy_decimals: 3
       id: dsmr_electricity_currently_delivered
@@ -137,17 +121,29 @@ sensor:
       name: "Gas Consumed"
       state_class: total_increasing
 
+  - platform: template
+    id: template_current_l1
+    name: "Template Current L1"
+    update_interval: 2s
+    lambda: |-
+      float l1 = id(dsmr_phase_currently_returned_l1).state > 0 ? - id(dsmr_phase_power_current_l1).state : id(dsmr_phase_power_current_l1).state;
+      return l1;
+  - platform: template
+    id: template_current_l2
+    name: "Template Current L2"
+    update_interval: 2s
+    lambda: |-
+      float l2 = id(dsmr_phase_currently_returned_l2).state > 0 ? - id(dsmr_phase_power_current_l2).state : id(dsmr_phase_power_current_l2).state;
+      return l2;
+  - platform: template
+    id: template_current_l3
+    name: "Template Current L3"
+    update_interval: 2s
+    lambda: |-
+      float l3 = id(dsmr_phase_currently_returned_l3).state > 0 ? - id(dsmr_phase_power_current_l3).state : id(dsmr_phase_power_current_l3).state;
+      return l3;
+
 text_sensor:
-  - platform: version
-    hide_timestamp: true
-    name: ${upper_devicename} Version
-  - platform: wifi_info
-    ip_address:
-      name: "${upper_devicename} IP Address"
-    ssid:
-      name: "${upper_devicename} Wi-Fi SSID"
-    bssid:
-      name: "${upper_devicename} Wi-Fi BSSID"
   - platform: dsmr
     timestamp:
       id: dsmr_timestamp
@@ -177,8 +173,9 @@ text_sensor:
       }
       return result;
 
+################ Actions ################
 interval:
-  - interval: 15sec
+  - interval: 10sec
     then:
       - http_request.post:
           url: !secret dsmr_reader_url
@@ -210,3 +207,21 @@ interval:
             root["phase_voltage_l2"] = id(dsmr_phase_voltage_l2).state;
             root["phase_voltage_l3"] = id(dsmr_phase_voltage_l3).state;
             root["timestamp"] = id(dsmr_timestamp_formatted).state;
+
+  - interval: 3sec
+    then:
+      - http_request.post:
+          url: !lambda |-
+            std::string url;
+
+            float l1 = id(dsmr_phase_currently_returned_l1).state > 0 ? - id(dsmr_phase_power_current_l1).state : id(dsmr_phase_power_current_l1).state;
+            float l2 = id(dsmr_phase_currently_returned_l2).state > 0 ? - id(dsmr_phase_power_current_l2).state : id(dsmr_phase_power_current_l2).state;
+            float l3 = id(dsmr_phase_currently_returned_l3).state > 0 ? - id(dsmr_phase_power_current_l3).state : id(dsmr_phase_power_current_l3).state;
+
+            url.append("http://192.168.88.216/currents?L1=");
+            url.append(to_string(l1*10));
+            url.append("&L2=");
+            url.append(to_string(l2*10));
+            url.append("&L3=");
+            url.append(to_string(l3*10));
+            return url.c_str();

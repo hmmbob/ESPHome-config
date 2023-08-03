@@ -1,24 +1,24 @@
 binary_sensor:
   - platform: status
-    name: ${upper_devicename} Status
+    name: Status
 
 sensor:
   - platform: uptime
-    name: ${upper_devicename} uptime
+    name: Uptime
     update_interval: 300s
   - platform: wifi_signal
-    name: ${upper_devicename} WiFi signaal
+    name: WiFi signaal
     update_interval: 300s
 
 text_sensor:
   - platform: wifi_info
     ip_address:
-      name: ${upper_devicename} IP Address
+      name: IP Address
     ssid:
-      name: ${upper_devicename} Connected SSID
+      name: Connected SSID
     bssid:
-      name: ${upper_devicename} Connected BSSID
+      name: Connected BSSID
     mac_address:
-      name: ${upper_devicename} Mac Address
+      name: Mac Address
   - platform: version
-    name: ${upper_devicename} Version
+    name: Version

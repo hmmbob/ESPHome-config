@@ -1,15 +1,17 @@
 substitutions:
   devicename: kast
-  upper_devicename: Kast
+  friendly_name: Kast
 
+################ Generics ################
 esphome:
-  name: $devicename
+  name: ${devicename}
+  friendly_name: ${friendly_name}
   platform: ESP8266
   board: esp01_1m
 
 wifi:
   manual_ip:
-    static_ip: !secret wifi_static_ip_keuken
+    static_ip: !secret wifi_static_ip_kast
 
 # General settings: captive portal, logger, api, ota, time, restart switch, wifi
 # General sensors: status, uptime, version, wifi info
@@ -17,19 +19,20 @@ packages:
   general_settings: !include general_settings.yaml
   general_sensors: !include general_sensors.yaml
 
+################ Components ################
 binary_sensor:
   - platform: gpio
     pin:
       number: GPIO0
       mode: INPUT_PULLUP
       inverted: True
-    name: ${upper_devicename} Button
+    name: Button
     on_press:
       - switch.toggle: relay
 
 switch:
   - platform: gpio
-    name: ${upper_devicename}
+    name: Switch
     pin: GPIO12
     restore_mode: RESTORE_DEFAULT_OFF
     id: relay
@@ -45,5 +48,5 @@ output:
 light:
   # ... and then make a light out of it.
   - platform: monochromatic
-    name: ${upper_devicename} Green LED
+    name: Green LED
     output: s20_green_led
