@@ -33,8 +33,8 @@ wifi:
 # General settings: captive portal, logger, api, ota, time, restart switch, wifi
 # General sensors: status, uptime, version, wifi info etc
 packages:
-  general_settings: !include general_settings.yaml
-  general_sensors: !include general_sensors.yaml
+  general_settings: !include includes/general_settings.yaml
+  general_sensors: !include includes/general_sensors.yaml
 
 web_server:
 
@@ -69,7 +69,7 @@ sensor:
       rising_edge: DISABLE
       falling_edge: INCREMENT
     state_class: measurement
-    # update_interval: 1s
+    update_interval: 1s
     internal_filter: 100us
     accuracy_decimals: 0
     unit_of_measurement: "L/min"
@@ -81,6 +81,7 @@ sensor:
     device_class: "water"
     icon: mdi:water
     unit_of_measurement: L
+    update_interval: 1s
     accuracy_decimals: 0
     lambda: |-
       if (id(watermeter_pulse).state > 0) id(totalWaterUsage) += 1;
