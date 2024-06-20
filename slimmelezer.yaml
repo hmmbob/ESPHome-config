@@ -8,9 +8,10 @@ esphome:
   name: ${devicename}
   friendly_name: ${friendly_name}
   comment: "${device_description}"
-  platform: ESP8266
+
+esp8266:
   board: d1_mini
-  esp8266_restore_from_flash: true
+  restore_from_flash: true
 
 wifi:
   manual_ip:
@@ -37,6 +38,7 @@ dsmr:
 
 http_request:
   timeout: 2s
+  esp8266_disable_ssl_support: true
 
 uart:
   - id: uart_bus
@@ -184,7 +186,6 @@ interval:
             Authorization: !secret dsmr_reader_token
             # Authorization: Token ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890
             Content-Type: application/json
-          verify_ssl: false
           json: |-
             root["electricity_currently_delivered"] = id(dsmr_electricity_currently_delivered).state;
             root["electricity_currently_returned"] = id(dsmr_electricity_currently_returned).state;
@@ -214,9 +215,9 @@ interval:
           url: !lambda |-
             std::string url;
 
-            float l1 = id(dsmr_phase_currently_returned_l1).state > 0 ? - id(dsmr_phase_power_current_l1).state : id(dsmr_phase_power_current_l1).state;
-            float l2 = id(dsmr_phase_currently_returned_l2).state > 0 ? - id(dsmr_phase_power_current_l2).state : id(dsmr_phase_power_current_l2).state;
-            float l3 = id(dsmr_phase_currently_returned_l3).state > 0 ? - id(dsmr_phase_power_current_l3).state : id(dsmr_phase_power_current_l3).state;
+            float l1 = id(template_current_l1).state;
+            float l2 = id(template_current_l2).state;
+            float l3 = id(template_current_l3).state;
 
             url.append("http://192.168.88.216/currents?L1=");
             url.append(to_string(l1*10));
