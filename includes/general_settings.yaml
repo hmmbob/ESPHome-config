@@ -18,6 +18,7 @@ api:
     key: !secret api_key
 
 ota:
+  platform: esphome
 
 time:
   - platform: homeassistant
