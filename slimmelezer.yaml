@@ -34,7 +34,6 @@ web_server:
 ################ Components ################
 dsmr:
   id: dsmr_instance
-#  request_interval: 5s
 
 http_request:
   timeout: 2s
@@ -212,6 +211,8 @@ interval:
   - interval: 2sec
     then:
       - http_request.post:
+          headers:
+            Content-Length: 0
           url: !lambda |-
             std::string url;
 
