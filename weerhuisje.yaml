@@ -33,7 +33,7 @@ uart:
 i2c:
   sda: D5
   scl: D6
-  scan: true
+  scan: false
 
 ################ Sensors ################
 sensor:
