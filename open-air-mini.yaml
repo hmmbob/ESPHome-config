@@ -12,10 +12,6 @@ esphome:
 esp32:
   board: esp32dev
 
-wifi:
-  manual_ip:
-    static_ip: !secret wifi_static_ip_open_air_mini
-
 # General settings: captive portal, logger, api, ota, time, restart switch, wifi
 # General sensors: status, uptime, version, wifi info etc
 packages:

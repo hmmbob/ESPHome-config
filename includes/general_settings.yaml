@@ -5,9 +5,6 @@ wifi:
   ap:
     ssid: ${friendly_name} hotspot
     password: !secret wifi_fallback_password
-  manual_ip:
-    gateway: !secret wifi_gateway
-    subnet: !secret wifi_subnet
 
 captive_portal:
 

@@ -17,10 +17,6 @@ esp32:
   framework:
     type: esp-idf
 
-wifi:
-  manual_ip:
-    static_ip: !secret wifi_static_ip_bt_proxy_0
-
 # General settings: captive portal, logger, api, ota, time, restart switch, wifi
 # General sensors: status, uptime, version, wifi info etc
 packages:

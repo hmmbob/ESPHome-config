@@ -26,10 +26,6 @@ status_led:
     number: 2
     inverted: true
 
-wifi:
-  manual_ip:
-    static_ip: !secret wifi_static_ip_waterlezer
-
 # General settings: captive portal, logger, api, ota, time, restart switch, wifi
 # General sensors: status, uptime, version, wifi info etc
 packages:
@@ -39,7 +35,8 @@ packages:
 web_server:
 
 api:
-  #via Home Assistant Ontwikkelhulpmiddelen > services zoeken op esphome.watermeter_set_water_reading en via deze methode de juiste beginstand invoeren
+  # via Home Assistant Ontwikkelhulpmiddelen > services zoeken op esphome.watermeter_set_water_reading
+  # en via deze methode de juiste beginstand invoeren
   services:
     - service: set_water_reading
       variables:

@@ -12,10 +12,6 @@ esphome:
 esp8266:
   board: nodemcuv2
 
-wifi:
-  manual_ip:
-    static_ip: !secret wifi_static_ip_weerhuisje
-
 # General settings: captive portal, logger, api, ota, time, restart switch, wifi
 # General sensors: status, uptime, version, wifi info etc
 packages:

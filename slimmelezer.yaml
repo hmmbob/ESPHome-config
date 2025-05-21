@@ -13,10 +13,6 @@ esp8266:
   board: d1_mini
   restore_from_flash: true
 
-wifi:
-  manual_ip:
-    static_ip: !secret wifi_static_ip_p1reader
-
 # General settings: captive portal, logger, api, ota, time, restart switch, wifi
 # General sensors: status, uptime, version, wifi info etc
 packages:
@@ -28,6 +24,8 @@ logger:
   # the same time uart on pin 13 / D7 is working.
   baud_rate: 0
   level: info
+  logs:
+    component: ERROR # Mute "Component ... took a long time for an operation" warnings
 
 web_server:
 
