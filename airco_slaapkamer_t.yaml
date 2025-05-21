@@ -1,8 +1,8 @@
 substitutions:
   device_description: ESPHome MHI-AC-Ctrl-ESPHome
-  deviceid: "airco_woonkamer"
+  deviceid: "airco_slaapkamer_t"
   devicename: ${deviceid}
-  friendly_name: "Airco woonkamer"
+  friendly_name: "Airco slaapkamer T"
 
 ################ Generics ################
 esphome:
@@ -30,10 +30,9 @@ web_server:
 sensor:
   - platform: homeassistant
     id: room_temperature_sensor
-    entity_id: climate.woonkamer
-    attribute: current_temperature
+    entity_id: sensor.xiaomi_temperature_humidity_sensor_3_temperature
 
 # Override the initial horizontal and vertical vanes positions
 MhiAcCtrl:
-  initial_horizontal_vanes_position: 1 # Left/Center
+  initial_horizontal_vanes_position: 2 # Center
   initial_vertical_vanes_position: 5 # Swing
