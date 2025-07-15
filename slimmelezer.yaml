@@ -179,7 +179,7 @@ interval:
       - http_request.post:
           url: !secret dsmr_reader_url
           # url: http://x.x.x.x/api/v2/datalogger/dsmrreading
-          headers:
+          request_headers:
             Authorization: !secret dsmr_reader_token
             # Authorization: Token ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890
             Content-Type: application/json
@@ -209,7 +209,7 @@ interval:
   - interval: 2sec
     then:
       - http_request.post:
-          headers:
+          request_headers:
             Content-Length: 0
           url: !lambda |-
             std::string url;
