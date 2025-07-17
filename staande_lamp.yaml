@@ -12,29 +12,23 @@ esphome:
 esp8266:
   board: esp8285
 
-wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
+# General settings: captive portal, logger, api, ota, time, restart, webserver, wifi
+# General sensors: status, uptime, version, wifi info etc
+packages:
+  general_settings: !include includes/general_settings.yaml
+  general_sensors: !include includes/general_sensors.yaml
 
-logger:
-
-api:
-  encryption:
-    key: !secret api_key
+################ Remove components ################
+captive_portal: !remove
 
 ota:
-  platform: esphome
+  - id: !remove web_server_ota
 
-time:
-  - platform: homeassistant
-    id: homeassistant_time
-    timezone: Europe/Amsterdam
+web_server: !remove
 
-button:
-  - platform: restart
-    name: Restart
-    entity_category: diagnostic
-
+wifi:
+  ap: !remove 
+  
 ################ Components ################
 status_led:
   pin:

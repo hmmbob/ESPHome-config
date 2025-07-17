@@ -17,6 +17,7 @@ api:
 ota:
   - platform: esphome
   - platform: web_server
+    id: web_server_ota
 
 time:
   - platform: homeassistant
