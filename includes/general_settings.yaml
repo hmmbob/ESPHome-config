@@ -15,7 +15,8 @@ api:
     key: !secret api_key
 
 ota:
-  platform: esphome
+  - platform: esphome
+  - platform: web_server
 
 time:
   - platform: homeassistant
@@ -29,3 +30,5 @@ button:
   - platform: safe_mode
     name: Safe Mode Boot
     entity_category: diagnostic
+
+web_server:
