@@ -4,27 +4,13 @@ substitutions:
   devicename: ${deviceid}
   friendly_name: "Airco woonkamer"
 
-################ Generics ################
-esphome:
-  name: ${deviceid}
-  friendly_name: ${friendly_name}
-  comment: "${device_description}"
-  platformio_options:
-    # Run CPU at 160Mhz to fix mhi_ac_ctrl_core.loop error: -2
-    board_build.f_cpu: 160000000L
-
-esp8266:
-  board: d1_mini
-
-# General settings: captive portal, logger, api, ota, time, restart switch, wifi
+# General settings: captive portal, logger, api, ota, time, restart, webserver, wifi
 # General sensors: status, uptime, version, wifi info etc
 # Airco common: MHI-AC-Ctrl-ESPHome, climate, sensors, api services shared between the 4 a/c units
 packages:
   general_settings: !include includes/general_settings.yaml
   general_sensors: !include includes/general_sensors.yaml
   airco_common: !include includes/airco_common.yaml
-
-web_server:
 
 # Specific external temperature sensor for this device
 sensor:

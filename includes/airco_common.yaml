@@ -1,9 +1,21 @@
-################ Common airco code ################
+################ Generics ################
+esphome:
+  name: ${deviceid}
+  friendly_name: ${friendly_name}
+  comment: "${device_description}"
+  platformio_options:
+    # Run CPU at 160Mhz to fix mhi_ac_ctrl_core.loop error: -2
+    board_build.f_cpu: 160000000L
+
+esp8266:
+  board: d1_mini
+
 logger:
   logs:
     component: ERROR # Mute "Component MhiAcCtrl took a long time for an operation" warnings
     mhi.platform: INFO # Mute external temperature sensor warnings
 
+################ Common airco code ################
 external_components:
   - source: github://ginkage/MHI-AC-Ctrl-ESPHome@master
     components: [MhiAcCtrl]
