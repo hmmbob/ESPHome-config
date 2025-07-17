@@ -3,30 +3,10 @@ substitutions:
   friendly_name: BT Proxy ground floor
   device_description: Bluetooth proxy op de begane grond
 
-################ Generics ################
-esphome:
-  name: ${name}
-  friendly_name: ${friendly_name}
-  comment: "${device_description}"
-  project:
-    name: esphome.bluetooth-proxy
-    version: "1.0"
-
-esp32:
-  board: m5stack-atom
-  framework:
-    type: esp-idf
-
-# General settings: captive portal, logger, api, ota, time, restart switch, wifi
+# General settings: captive portal, logger, api, ota, time, restart, webserver, wifi
 # General sensors: status, uptime, version, wifi info etc
+# BT Proxy common: shared config for all BT Proxy devices
 packages:
   general_settings: !include includes/general_settings.yaml
   general_sensors: !include includes/general_sensors.yaml
-
-################ Components ################
-esp32_ble_tracker:
-  scan_parameters:
-    active: true
-
-bluetooth_proxy:
-  active: true
+  bt_proxy_common: !include includes/bt_proxy_common.yaml
