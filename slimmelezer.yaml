@@ -83,12 +83,15 @@ sensor:
     current_l1:
       id: dsmr_phase_power_current_l1
       name: "Current Phase 1"
+      internal: true
     current_l2:
       id: dsmr_phase_power_current_l2
       name: "Current Phase 2"
+      internal: true
     current_l3:
       id: dsmr_phase_power_current_l3
       name: "Current Phase 3"
+      internal: true
     power_delivered_l1:
       accuracy_decimals: 3
       id: dsmr_phase_currently_delivered_l1
@@ -120,21 +123,24 @@ sensor:
 
   - platform: template
     id: template_current_l1
-    name: "Template Current L1"
+    name: "Current Phase 1 (template)"
+    icon: mdi:current-ac
     update_interval: 2s
     lambda: |-
       float l1 = id(dsmr_phase_currently_returned_l1).state > 0 ? - id(dsmr_phase_power_current_l1).state : id(dsmr_phase_power_current_l1).state;
       return l1;
   - platform: template
     id: template_current_l2
-    name: "Template Current L2"
+    name: "Current Phase 2 (template)"
+    icon: mdi:current-ac
     update_interval: 2s
     lambda: |-
       float l2 = id(dsmr_phase_currently_returned_l2).state > 0 ? - id(dsmr_phase_power_current_l2).state : id(dsmr_phase_power_current_l2).state;
       return l2;
   - platform: template
     id: template_current_l3
-    name: "Template Current L3"
+    name: "Current Phase 3 (template)"
+    icon: mdi:current-ac
     update_interval: 2s
     lambda: |-
       float l3 = id(dsmr_phase_currently_returned_l3).state > 0 ? - id(dsmr_phase_power_current_l3).state : id(dsmr_phase_power_current_l3).state;
@@ -169,6 +175,23 @@ text_sensor:
         result = year + "-" + month + "-" + day + "T" + hour + ":" + minute + ":" + second + timezone;
       }
       return result;
+
+binary_sensor:
+  - platform: template
+    id: power_failure_l1
+    name: "Power Failure Phase 1"
+    lambda: |-
+      return id(dsmr_phase_voltage_l1).state < 200.0;
+  - platform: template
+    id: power_failure_l2
+    name: "Power Failure Phase 2"
+    lambda: |-
+      return id(dsmr_phase_voltage_l2).state < 200.0;
+  - platform: template
+    id: power_failure_l3
+    name: "Power Failure Phase 3"
+    lambda: |-
+      return id(dsmr_phase_voltage_l3).state < 200.0;
 
 ################ Actions ################
 interval:
