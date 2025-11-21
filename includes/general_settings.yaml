@@ -5,6 +5,7 @@ wifi:
   ap:
     ssid: ${friendly_name} hotspot
     password: !secret wifi_fallback_password
+  min_auth_mode: WPA2
 
 captive_portal:
 
