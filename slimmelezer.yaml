@@ -35,6 +35,27 @@ http_request:
   timeout: 2s
   esp8266_disable_ssl_support: true
 
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  discover_ip: true
+  discovery: false
+  reboot_timeout: 0s
+  topic_prefix: null # do not send sensors to mqtt automatically
+  on_connect:
+    - lambda: |-
+        id(mqtt_connected).publish_state(true);
+    - logger.log:
+        format: "MQTT Connected"
+        level: INFO
+  on_disconnect:
+    - lambda: |-
+        id(mqtt_connected).publish_state(false);
+    - logger.log:
+        format: "MQTT Disconnected"
+        level: INFO
+
 uart:
   - id: uart_bus
     baud_rate: 115200
@@ -192,6 +213,26 @@ binary_sensor:
     name: "Power Failure Phase 3"
     lambda: |-
       return id(dsmr_phase_voltage_l3).state < 200.0;
+  - platform: template
+    id: mqtt_connected
+    name: "MQTT Connected"
+    device_class: connectivity
+    entity_category: diagnostic
+
+switch:
+  - platform: template
+    name: "Enable MQTT"
+    entity_category: "config"
+    lambda: |-
+      if (id(mqtt_connected).state) {
+        return true;
+      } else {
+        return false;
+      }
+    turn_on_action:
+      - mqtt.enable:
+    turn_off_action:
+      - mqtt.disable:
 
 ################ Actions ################
 interval:
@@ -229,20 +270,41 @@ interval:
 
   - interval: 2sec
     then:
-      - http_request.post:
-          request_headers:
-            Content-Length: 0
-          url: !lambda |-
-            std::string url;
+      - if:
+          condition:
+            mqtt.connected:
+          then:
+            - mqtt.publish:
+                topic: "SmartEVSE-6360/Set/MainsMeter"
+                payload: !lambda |-
+                  char payload[32];
+                  float l1 = id(template_current_l1).state;
+                  float l2 = id(template_current_l2).state;
+                  float l3 = id(template_current_l3).state;
+                  int v1 = static_cast<int>(std::round(l1 * 10.0f));
+                  int v2 = static_cast<int>(std::round(l2 * 10.0f));
+                  int v3 = static_cast<int>(std::round(l3 * 10.0f));
+                  snprintf(payload, sizeof(payload), "%d:%d:%d", v1, v2, v3);
+                  return std::string(payload);
+          else:
+            - logger.log:
+                format: "MQTT not connected, falling back to HTTP"
+                level: INFO
+                tag: MainsMeter
+            - http_request.post:
+                request_headers:
+                  Content-Length: 0
+                url: !lambda |-
+                  std::string url;
 
-            float l1 = id(template_current_l1).state;
-            float l2 = id(template_current_l2).state;
-            float l3 = id(template_current_l3).state;
+                  float l1 = id(template_current_l1).state;
+                  float l2 = id(template_current_l2).state;
+                  float l3 = id(template_current_l3).state;
 
-            url.append("http://192.168.88.216/currents?L1=");
-            url.append(to_string(l1*10));
-            url.append("&L2=");
-            url.append(to_string(l2*10));
-            url.append("&L3=");
-            url.append(to_string(l3*10));
-            return url.c_str();
+                  url.append("http://192.168.88.216/currents?L1=");
+                  url.append(to_string(l1*10));
+                  url.append("&L2=");
+                  url.append(to_string(l2*10));
+                  url.append("&L3=");
+                  url.append(to_string(l3*10));
+                  return url.c_str();
