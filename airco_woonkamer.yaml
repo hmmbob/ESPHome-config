@@ -15,10 +15,9 @@ packages:
 sensor:
   - platform: homeassistant
     id: room_temperature_sensor
-    entity_id: climate.woonkamer
-    attribute: current_temperature
+    entity_id: sensor.xiaomi_temperature_humidity_sensor_1_temperature
 
 # Override the initial horizontal and vertical vanes positions
 MhiAcCtrl:
-  initial_horizontal_vanes_position: 1 # Left/Center
-  initial_vertical_vanes_position: 5 # Swing
+  initial_horizontal_vanes_position: 2 # Left/Center
+  initial_vertical_vanes_position: 2 # Up/Center

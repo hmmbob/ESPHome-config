@@ -19,5 +19,5 @@ sensor:
 
 # Override the initial horizontal and vertical vanes positions
 MhiAcCtrl:
-  initial_horizontal_vanes_position: 2 # Center
+  initial_horizontal_vanes_position: 3 # Center
   initial_vertical_vanes_position: 5 # Swing

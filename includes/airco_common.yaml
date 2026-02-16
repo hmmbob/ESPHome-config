@@ -96,7 +96,7 @@ sensor:
       name: "Vanes"
       disabled_by_default: true
     vanesLR_pos:
-      name: "Vanes Left/Right"
+      name: "Vanes Left⁄Right"
       disabled_by_default: true
 
 select:
