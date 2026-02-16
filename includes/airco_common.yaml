@@ -1,6 +1,6 @@
 ################ Generics ################
 esphome:
-  name: ${deviceid}
+  name: ${devicename}
   friendly_name: ${friendly_name}
   comment: "${device_description}"
   platformio_options:

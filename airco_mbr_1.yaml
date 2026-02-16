@@ -1,7 +1,6 @@
 substitutions:
   device_description: ESPHome MHI-AC-Ctrl-ESPHome
-  deviceid: "airco_master_bedroom"
-  devicename: ${deviceid}
+  devicename: "airco_master_bedroom"
   friendly_name: "Airco master bedroom"
 
 # General settings: captive portal, logger, api, ota, time, restart, webserver, wifi

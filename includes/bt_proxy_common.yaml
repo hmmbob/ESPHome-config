@@ -1,6 +1,6 @@
 ################ Generics ################
 esphome:
-  name: ${name}
+  name: ${devicename}
   friendly_name: ${friendly_name}
   comment: "${device_description}"
   project:

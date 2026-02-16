@@ -1,11 +1,11 @@
 substitutions:
-  name: open-air-mini
+  devicename: open-air-mini
   friendly_name: Open Air Mini
   device_description: Mechanische ventilatie DucoBox Silent
 
 ################ Generics ################
 esphome:
-  name: ${name}
+  name: ${devicename}
   friendly_name: ${friendly_name}
   comment: "${device_description}"
 

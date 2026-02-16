@@ -1,5 +1,5 @@
 substitutions:
-  name: bt-proxy-ground-floor
+  devicename: bt-proxy-ground-floor
   friendly_name: BT Proxy ground floor
   device_description: Bluetooth proxy op de begane grond
 

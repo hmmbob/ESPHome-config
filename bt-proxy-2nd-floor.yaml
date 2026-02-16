@@ -1,5 +1,5 @@
 substitutions:
-  name: bt-proxy-2nd-floor
+  devicename: bt-proxy-2nd-floor
   friendly_name: BT Proxy 2nd floor
   device_description: Bluetooth proxy op de 2e verdieping
 
