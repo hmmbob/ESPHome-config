@@ -15,7 +15,7 @@ packages:
 sensor:
   - platform: homeassistant
     id: room_temperature_sensor
-    entity_id: sensor.xiaomi_temperature_humidity_sensor_4_temperature
+    entity_id: sensor.temp_sensor_8_slaapkamer_m_temperatuur
 
 # Override the initial horizontal and vertical vanes positions
 MhiAcCtrl:
