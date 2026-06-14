@@ -11,14 +11,12 @@ esp32:
   board: m5stack-atom
   framework:
     type: esp-idf
+    advanced:
+      sram1_as_iram: true
 
 ################ Components ################
-esp32_ble_tracker:
-  scan_parameters:
-    active: true
-
 bluetooth_proxy:
-  active: true
+esp32_ble_tracker:
 
 ################ Remove webserver ################
 web_server: !remove
