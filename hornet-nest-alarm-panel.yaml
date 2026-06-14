@@ -1,0 +1,126 @@
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
+##
+## Hornet Nest Alarm Panel v1.2 (wESP32)
+## Firmware configuration for ESPHome
+## GitHub: https://github.com/taconsultingllc/hornet-nest-alarm-panel
+##
+## Copyright© 2025 Technology Automation Consulting LLC
+##
+## Permission is hereby granted, free of charge, to any person obtaining a copy
+## of this software and associated documentation files (the "Software"), to deal
+## in the Software without restriction, including without limitation the rights
+## to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+## copies of the Software, and to permit persons to whom the Software is
+## furnished to do so, subject to the following conditions:
+##
+## The above copyright notice and this permission notice shall be included in all
+## copies or substantial portions of the Software.
+##
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
+
+substitutions:
+  name: hornet-nest
+  friendly_name: Hornet Nest Alarm Panel
+  pir_delayed_off: 30s
+  sensor_debounce_time: 200ms
+  #sensor_inverted: "true"  #For NO (Normally Open) Sensors
+  sensor_inverted: "false" #For NC (Normally Closed) Sensors
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  name_add_mac_suffix: false
+  project:
+    name: taconsulting.hornet-nest-alarm-panel
+    version: "1.2"
+  on_boot:
+    then:
+      - text_sensor.template.publish:
+          id: device_id
+          state: !lambda "return get_mac_address();"
+
+esp32:
+  board: wesp32
+  framework:
+    type: esp-idf
+    advanced:
+      minimum_chip_revision: "3.1"
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_key
+  services:
+    - service: play_rtttl
+      variables:
+        song_str: string
+      then:
+        - rtttl.play: !lambda "return song_str;"
+
+ota:
+  - platform: esphome
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: Europe/Amsterdam
+
+web_server:
+  port: 80
+  version: 3
+
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
+## ETHERNET
+## This component enables wired Ethernet connections for the wESP32 controller.
+## This component and the Wi-Fi component may NOT be used simultaneously,
+## even if both are physically available.
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
+ethernet:
+  type: RTL8201
+  mdc_pin: GPIO16
+  mdio_pin: GPIO17
+  clk:
+    pin:
+      number: GPIO0
+      ignore_strapping_warning: true
+    mode: CLK_EXT_IN
+  phy_addr: 0
+  phy_registers:
+    - address: 0x10
+      value: 0x1ffa
+      page_id: 0x7
+
+# Initialize the I2C Bus
+i2c:
+  sda:
+    number: 15
+    ignore_strapping_warning: true
+  scl: 4
+  scan: true
+  id: bus_a
+  frequency: 200kHz
+
+# Define I2C Devices (Microchip MCP23017 I/O Port Expanders)
+mcp23017:
+  # Inputs 1-14
+  - id: "mcp23017_1"
+    address: 0x20
+  # Inputs 15-28
+  - id: "mcp23017_2"
+    address: 0x21
+  # Inputs 29-42
+  - id: "mcp23017_3"
+    address: 0x22
+  # +12V Outputs & Misc I/O
+  - id: "mcp23017_4"
+    address: 0x23
+
+packages:
+  hnap_diagnostics: !include includes/hornet_nest_alarm_panel/hnap-rev1.2-diagnostics.yaml
+  hnap_inputs_1_14: !include includes/hornet_nest_alarm_panel/hnap-rev1.2-inputs-1-14.yaml
+  hnap_inputs_15_28: !include includes/hornet_nest_alarm_panel/hnap-rev1.2-inputs-15-28.yaml
+  hnap_inputs_29_42: !include includes/hornet_nest_alarm_panel/hnap-rev1.2-inputs-29-42.yaml
+  hnap_outputs: !include includes/hornet_nest_alarm_panel/hnap-rev1.2-outputs.yaml
+  hnap_misc_io: !include includes/hornet_nest_alarm_panel/hnap-rev1.2-misc-io.yaml
+  # hnap_wiegand: !include includes/hornet_nest_alarm_panel/hnap-rev1.2-wiegand.yaml
