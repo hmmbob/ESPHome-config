@@ -1,24 +1,33 @@
 binary_sensor:
   - platform: status
     name: Status
+    icon: mdi:lan-connect
 
 sensor:
   - platform: uptime
     name: Uptime
+    icon: mdi:timer-outline
     update_interval: 300s
   - platform: wifi_signal
     name: WiFi signaal
+    icon: mdi:wifi
+    id: wifi_signal_sensor
     update_interval: 300s
 
 text_sensor:
   - platform: wifi_info
     ip_address:
       name: IP Address
+      icon: mdi:ip-network
     ssid:
       name: Connected SSID
+      icon: mdi:wifi
     bssid:
       name: Connected BSSID
+      icon: mdi:access-point-network
     mac_address:
       name: Mac Address
+      icon: mdi:barcode
   - platform: version
     name: Version
+    icon: mdi:information-outline

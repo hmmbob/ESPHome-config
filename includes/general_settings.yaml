@@ -28,9 +28,11 @@ time:
 button:
   - platform: restart
     name: Restart
+    icon: mdi:restart
     entity_category: diagnostic
   - platform: safe_mode
     name: Safe Mode Boot
+    icon: mdi:shield-refresh
     entity_category: diagnostic
 
 web_server:
