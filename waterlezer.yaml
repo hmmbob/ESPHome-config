@@ -12,10 +12,16 @@ esphome:
   name_add_mac_suffix: false
   platformio_options:
     upload_speed: 921600
-
   project:
     name: smartstuff.waterlezer
     version: ${version}
+  on_boot:
+    priority: -100
+    then:
+      # Restore the native pulse counter total from the persisted meter value.
+      - pulse_counter.set_total_pulses:
+          id: watermeter_pulse
+          value: !lambda "return id(totalWaterUsage);"
 
 esp8266:
   board: esp12e
@@ -33,23 +39,26 @@ packages:
   general_sensors: !include includes/general_sensors.yaml
 
 api:
-  # via Home Assistant Ontwikkelhulpmiddelen > actions zoeken op esphome.watermeter_set_water_reading
-  # en via deze methode de juiste beginstand invoeren
+  # Via Home Assistant Ontwikkelhulpmiddelen > actions zoeken op
+  # esphome.waterlezer_set_water_reading en daarmee de beginstand invoeren.
   actions:
     - action: set_water_reading
       variables:
         meter_value: int
       then:
+        - pulse_counter.set_total_pulses:
+            id: watermeter_pulse
+            value: !lambda "return meter_value;"
         - globals.set:
             id: totalWaterUsage
-            value: !lambda "return ( meter_value );"
+            value: !lambda "return meter_value;"
 
 ################ Sensors ################
 globals:
   - id: totalWaterUsage
     type: int
-    restore_value: true # aanpassen naar no indien de nieuwe waarde onder de oude ligt
-    initial_value: "0" # beginstand van je watermeter -> aanpassen via Home Assistant services
+    restore_value: true
+    initial_value: "0"
 
 sensor:
   - platform: pulse_counter
@@ -57,7 +66,7 @@ sensor:
       number: 5
       mode:
         input: true
-        pullup: true #v3.5 aanzetten
+        pullup: true
     id: watermeter_pulse
     name: "Watermeter pulse"
     count_mode:
@@ -69,15 +78,16 @@ sensor:
     accuracy_decimals: 0
     unit_of_measurement: "L/min"
     internal: true
-
-  - platform: template
-    name: "Watermeter total"
-    state_class: "total_increasing"
-    device_class: "water"
-    icon: mdi:water
-    unit_of_measurement: L
-    update_interval: 1s
-    accuracy_decimals: 0
-    lambda: |-
-      if (id(watermeter_pulse).state > 0) id(totalWaterUsage) += 1;
-      return id(totalWaterUsage);
+    total:
+      id: watermeter_total
+      name: "Watermeter total"
+      state_class: total_increasing
+      device_class: water
+      icon: mdi:water
+      unit_of_measurement: L
+      accuracy_decimals: 0
+      on_value:
+        then:
+          - globals.set:
+              id: totalWaterUsage
+              value: !lambda "return (int) roundf(x);"
