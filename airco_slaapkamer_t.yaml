@@ -1,6 +1,6 @@
 substitutions:
   device_description: ESPHome MHI-AC-Ctrl-ESPHome
-  devicename: "airco_slaapkamer_t"
+  devicename: "airco-slaapkamer-t"
   friendly_name: "Airco slaapkamer T"
 
 # General settings: captive portal, logger, api, ota, time, restart, webserver, wifi
