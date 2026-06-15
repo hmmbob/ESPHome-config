@@ -33,10 +33,10 @@ packages:
   general_sensors: !include includes/general_sensors.yaml
 
 api:
-  # via Home Assistant Ontwikkelhulpmiddelen > services zoeken op esphome.watermeter_set_water_reading
+  # via Home Assistant Ontwikkelhulpmiddelen > actions zoeken op esphome.watermeter_set_water_reading
   # en via deze methode de juiste beginstand invoeren
-  services:
-    - service: set_water_reading
+  actions:
+    - action: set_water_reading
       variables:
         meter_value: int
       then:

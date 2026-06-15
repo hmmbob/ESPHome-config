@@ -51,8 +51,8 @@ logger:
 api:
   encryption:
     key: !secret api_key
-  services:
-    - service: play_rtttl
+  actions:
+    - action: play_rtttl
       variables:
         song_str: string
       then:

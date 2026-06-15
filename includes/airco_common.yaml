@@ -28,8 +28,8 @@ MhiAcCtrl:
 
 api:
   reboot_timeout: 0s
-  services:
-    - service: set_external_room_temperature
+  actions:
+    - action: set_external_room_temperature
       variables:
         temperature_value: float # temperature to set in Celsius
       then:
