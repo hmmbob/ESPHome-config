@@ -60,6 +60,7 @@ uart:
   - id: uart_bus
     baud_rate: 115200
     rx_pin: D7
+    rx_buffer_size: 1700
 
 ################ Sensors ################
 sensor:
