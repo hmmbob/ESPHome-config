@@ -1,0 +1,984 @@
+substitutions:
+  devicename: pool-controller
+  friendly_name: Pool Controller
+  device_description: Waveshare ESP32-S3-ETH-8DI-8RO pool controller
+
+esphome:
+  name: ${devicename}
+  friendly_name: ${friendly_name}
+  min_version: 2025.5.0
+  comment: "${device_description}"
+  on_boot:
+    priority: -10
+    then:
+      - pcf85063.read_time
+      - script.execute: enforce_pump_schedule
+      - script.execute: update_status_led
+      - script.execute: buzzer_boot
+
+esp32:
+  board: esp32s3box
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+packages:
+  general_settings: !include includes/general_settings.yaml
+  general_sensors: !include includes/general_sensors.yaml
+
+api:
+  on_client_connected:
+    then:
+      - lambda: |-
+          ESP_LOGI("pool.display", "API client connected");
+          id(api_client_connected) = true;
+      - script.execute: update_nextion_display
+  on_client_disconnected:
+    then:
+      - lambda: |-
+          ESP_LOGI("pool.display", "API client disconnected");
+          id(api_client_connected) = false;
+      - script.execute: update_nextion_display
+
+i2c:
+  sda: GPIO42
+  scl: GPIO41
+  scan: false
+  frequency: 100kHz
+  id: i2cbus
+
+pca9554:
+  - id: TCA9554_hub
+    address: 0x20
+
+# The Waveshare relays are labeled R01 through R08.
+# PCA9554 pin 0 maps to R01, pin 1 maps to R02, and so on through pin 7 = R08.
+# R07 and R08 are currently unused.
+
+one_wire:
+  - platform: gpio
+    id: pool_temperature_bus
+    pin: GPIO21
+
+output:
+  - platform: ledc
+    pin:
+      number: GPIO46
+      ignore_strapping_warning: true
+    id: buzzer
+
+  - platform: template
+    id: nextion_brightness_output
+    type: float
+    write_action:
+      - lambda: |-
+          float brightness = state;
+          if (brightness < 0.0f) {
+            brightness = 0.0f;
+          } else if (brightness > 1.0f) {
+            brightness = 1.0f;
+          }
+
+          id(pool_nextion).set_backlight_brightness(brightness);
+          ESP_LOGI("pool.display", "HA display brightness set to %.0f%%", brightness * 100.0f);
+
+rtttl:
+  output: buzzer
+  id: rtttl_buzzer
+  gain: 30%
+
+uart:
+  id: nextion_uart
+  tx_pin: GPIO43
+  rx_pin: GPIO44
+  baud_rate: 115200
+
+light:
+  - platform: monochromatic
+    name: Display backlight
+    icon: mdi:brightness-6
+    id: nextion_backlight
+    output: nextion_brightness_output
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: esp32_rmt_led_strip
+    name: Status LED
+    id: rgb_led
+    internal: true
+    rgb_order: RGB
+    chipset: WS2812
+    pin: GPIO38
+    num_leds: 1
+    restore_mode: ALWAYS_OFF
+    entity_category: diagnostic
+
+display:
+  # Nextion HMI display connected over the hardware UART header.
+  - platform: nextion
+    id: pool_nextion
+    uart_id: nextion_uart
+    brightness: 60%
+    update_interval: 60s
+    startup_override_ms: 1000ms
+    on_setup:
+      then:
+        - lambda: |-
+            ESP_LOGI("pool.display", "Nextion display verbonden");
+            id(pool_nextion).set_component_text("tTitle", "Pool Controller");
+            id(pool_nextion).set_component_text("tMsg", "Display online");
+        - script.execute: nextion_boot_refresh
+    on_touch:
+      then:
+        - lambda: |-
+            ESP_LOGI("pool.display", "Touch: page=%d component=%d event=%s", page_id, component_id, touch_event ? "press" : "release");
+        - if:
+            condition:
+              lambda: return touch_event;
+            then:
+              - lambda: |-
+                  switch (component_id) {
+                    case 14:
+                      ESP_LOGI("pool.display", "Nextion: pomp automatisch");
+                      id(pump_mode).make_call().set_option("Automatisch").perform();
+                      break;
+                    case 16:
+                      ESP_LOGI("pool.display", "Nextion: pomp handmatig aan");
+                      id(manual_pump_start).execute();
+                      break;
+                    case 18:
+                      ESP_LOGI("pool.display", "Nextion: pomp handmatig uit");
+                      id(manual_pump_stop).execute();
+                      break;
+                    case 20:
+                      ESP_LOGI("pool.display", "Nextion: verlichting toggle");
+                      id(pool_light).toggle();
+                      break;
+                    case 22:
+                      ESP_LOGI("pool.display", "Nextion: watervulling toggle");
+                      id(water_fill).toggle();
+                      break;
+                    case 24:
+                      ESP_LOGI("pool.display", "Nextion: roldeck open");
+                      id(roldeck_open).execute();
+                      break;
+                    case 26:
+                      ESP_LOGI("pool.display", "Nextion: roldeck stop");
+                      id(roldeck_stop).execute();
+                      break;
+                    case 28:
+                      ESP_LOGI("pool.display", "Nextion: roldeck dicht");
+                      id(roldeck_close).execute();
+                      break;
+                    default:
+                      id(pool_nextion).set_component_text_printf("tMsg", "Touch %d", component_id);
+                      break;
+                  }
+        - script.execute: update_nextion_display
+    on_buffer_overflow:
+      then:
+        - lambda: |-
+            ESP_LOGW("pool.display", "Nextion serial buffer overflow");
+
+time:
+  # Home Assistant time is used only to synchronize the local RTC when HA is available.
+  - id: !extend homeassistant_time
+    on_time_sync:
+      then:
+        - pcf85063.write_time:
+        - script.execute: enforce_pump_schedule
+        - script.execute: update_status_led
+  - platform: pcf85063
+    id: rtc_time
+
+globals:
+  # Runtime-only state used by scripts; these values are intentionally not restored after reboot.
+  - id: roldeck_last_direction
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: water_fill_end_millis
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
+
+  - id: pool_pump_stop_pending
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: pump_schedule_was_active
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: pump_schedule_start_edge
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: api_client_connected
+    type: bool
+    restore_value: false
+    initial_value: "false"
+
+number:
+  # Water fill duration is stored locally and used by the ESP-side safety auto-stop.
+  - platform: template
+    name: Watervulling duur
+    icon: mdi:timer-cog
+    id: water_fill_duration_minutes
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_value: 30
+    min_value: 5
+    max_value: 60
+    step: 5
+    unit_of_measurement: min
+    set_action:
+      - lambda: |-
+          ESP_LOGI("pool.waterfill", "Watervulling duur ingesteld op %.0f minuten", x);
+          if (id(water_fill).state) {
+            const uint32_t duration_ms = (uint32_t) (x * 60000.0f);
+            id(water_fill_end_millis) = millis() + duration_ms;
+          }
+      - if:
+          condition:
+            switch.is_on: water_fill
+          then:
+            - component.update: water_fill_remaining_minutes
+            - script.execute: update_nextion_display
+            - script.execute: water_fill_auto_stop
+
+datetime:
+  # Pump schedule times are stored locally on the ESP and exposed as time-only controls in HA.
+  - platform: template
+    name: Pomp starttijd
+    icon: mdi:clock-start
+    id: pump_start_time
+    entity_category: config
+    type: time
+    optimistic: true
+    initial_value: "09:00:00"
+    restore_value: true
+    on_value:
+      - script.execute: enforce_pump_schedule
+
+  - platform: template
+    name: Pomp stoptijd
+    icon: mdi:clock-end
+    id: pump_stop_time
+    entity_category: config
+    type: time
+    optimistic: true
+    initial_value: "17:00:00"
+    restore_value: true
+    on_value:
+      - script.execute: enforce_pump_schedule
+
+select:
+  # Pump mode determines whether the pump follows the schedule or a temporary manual override.
+  # Manual modes are not restored because relay R01 intentionally restores off after reboot.
+  - platform: template
+    name: Pomp modus
+    icon: mdi:tune-variant
+    id: pump_mode
+    entity_category: config
+    optimistic: true
+    restore_value: false
+    initial_option: Automatisch
+    options:
+      - Automatisch
+      - Handmatig aan
+      - Handmatig uit
+    set_action:
+      - lambda: |-
+          ESP_LOGI("pool.pump", "Pomp modus gewijzigd naar: %s", x.c_str());
+      - script.execute: apply_pump_mode
+
+sensor:
+  # Water temperature is sampled locally every 10 seconds; display updates run on each accepted sensor value.
+  - platform: dallas_temp
+    one_wire_id: pool_temperature_bus
+    name: Watertemperatuur
+    icon: mdi:thermometer-water
+    id: pool_water_temperature
+    resolution: 12
+    update_interval: 10s
+    filters:
+      - delta: 0.1
+    on_value:
+      - script.execute: update_nextion_display
+
+  - platform: template
+    name: Watervulling resterende tijd
+    icon: mdi:timer-sand
+    id: water_fill_remaining_minutes
+    unit_of_measurement: min
+    accuracy_decimals: 0
+    update_interval: 10s
+    lambda: |-
+      if (!id(water_fill).state) {
+        return 0.0f;
+      }
+      const uint32_t now = millis();
+      const uint32_t end = id(water_fill_end_millis);
+      if ((int32_t) (end - now) <= 0) {
+        return 0.0f;
+      }
+      const uint32_t remaining_ms = end - now;
+      return (float) ((remaining_ms + 59999UL) / 60000UL);
+    filters:
+      - delta: 1.0
+
+binary_sensor:
+  - platform: gpio
+    id: roldeck_open_input
+    name: Roldeck open knop
+    icon: mdi:arrow-up-bold-box
+    pin:
+      number: GPIO4
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on_off: 50ms
+    on_press:
+      - script.execute: roldeck_open
+
+  - platform: gpio
+    id: roldeck_close_input
+    name: Roldeck dicht knop
+    icon: mdi:arrow-down-bold-box
+    pin:
+      number: GPIO5
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on_off: 50ms
+    on_press:
+      - script.execute: roldeck_close
+
+switch:
+  # User-facing pump switch maps to the pump mode instead of directly bypassing schedule logic.
+  - platform: template
+    name: Pomp
+    icon: mdi:pump
+    id: pool_pump
+    lambda: "return id(pool_pump_relay).state;"
+    turn_on_action:
+      - lambda: |-
+          ESP_LOGI("pool.pump", "Handmatige pompstart via Home Assistant");
+      - script.execute: manual_pump_start
+    turn_off_action:
+      - lambda: |-
+          ESP_LOGI("pool.pump", "Handmatige pompstop via Home Assistant");
+      - script.execute: manual_pump_stop
+
+  - platform: template
+    name: Pomp automatisch schema
+    icon: mdi:calendar-clock
+    id: pump_auto_schedule
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    turn_on_action:
+      - lambda: |-
+          ESP_LOGI("pool.pump", "Automatisch pompschema ingeschakeld");
+      - switch.template.publish:
+          id: pump_auto_schedule
+          state: ON
+      - select.set:
+          id: pump_mode
+          option: Automatisch
+      - script.execute: enforce_pump_schedule
+    turn_off_action:
+      - lambda: |-
+          ESP_LOGI("pool.pump", "Automatisch pompschema uitgeschakeld");
+      - switch.template.publish:
+          id: pump_auto_schedule
+          state: OFF
+      - select.set:
+          id: pump_mode
+          option: Handmatig uit
+
+  - platform: template
+    name: Geluidssignalen
+    icon: mdi:volume-high
+    id: buzzer_enabled
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+  # R01: filter pump
+  - platform: gpio
+    id: pool_pump_relay
+    internal: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      pca9554: TCA9554_hub
+      number: 0
+      mode:
+        output: true
+      inverted: false
+
+  # R02: ionizer
+  - platform: gpio
+    name: Ionisator
+    icon: mdi:atom
+    id: ionisator
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      pca9554: TCA9554_hub
+      number: 1
+      mode:
+        output: true
+      inverted: false
+    on_turn_on:
+      - lambda: |-
+          ESP_LOGI("pool.ionisator", "Ionisator schakelverzoek aan");
+      - if:
+          condition:
+            lambda: return !id(pool_pump_relay).state || id(pool_pump_stop_pending);
+          then:
+            - lambda: |-
+                ESP_LOGW("pool.ionisator", "Ionisator geblokkeerd: pomp uit of pompstop bezig");
+            - switch.turn_off: ionisator
+
+  # R03: pool light
+  - platform: gpio
+    name: Verlichting
+    icon: mdi:lightbulb
+    id: pool_light
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      pca9554: TCA9554_hub
+      number: 2
+      mode:
+        output: true
+      inverted: false
+
+  # R04: water-fill solenoid contactor
+  - platform: gpio
+    name: Watervulling
+    icon: mdi:water-plus
+    id: water_fill
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      pca9554: TCA9554_hub
+      number: 3
+      mode:
+        output: true
+      inverted: false
+    on_turn_on:
+      - lambda: |-
+          ESP_LOGI("pool.waterfill", "Watervulling aan; R04 actief");
+      - lambda: |-
+          const uint32_t duration_ms = (uint32_t) (id(water_fill_duration_minutes).state * 60000.0f);
+          id(water_fill_end_millis) = millis() + duration_ms;
+      - component.update: water_fill_remaining_minutes
+      - script.execute: update_status_led
+      - script.execute: update_nextion_display
+      - script.execute: buzzer_action
+      - script.execute: water_fill_auto_stop
+    on_turn_off:
+      - lambda: |-
+          ESP_LOGI("pool.waterfill", "Watervulling uit; R04 uit");
+      - script.stop: water_fill_auto_stop
+      - lambda: "id(water_fill_end_millis) = 0;"
+      - component.update: water_fill_remaining_minutes
+      - script.execute: update_status_led
+      - script.execute: update_nextion_display
+      - script.execute: buzzer_warning
+
+  # R05: pool cover open pulse, dry contact to the Starline RDEB 2006 controller.
+  # - open: common terminal 2 to terminal 1
+  # Do not connect external voltage here; the RDEB provides its own control circuit.
+  - platform: gpio
+    name: Roldeck open relais
+    id: roldeck_open_relay
+    internal: true
+    restore_mode: ALWAYS_OFF
+    interlock: [roldeck_close_relay]
+    interlock_wait_time: 500ms
+    pin:
+      pca9554: TCA9554_hub
+      number: 4
+      mode:
+        output: true
+      inverted: false
+
+  # R06: pool cover close pulse, dry contact to the Starline RDEB 2006 controller.
+  # - close: common terminal 2 to terminal 3
+  # Do not connect external voltage here; the RDEB provides its own control circuit.
+  - platform: gpio
+    name: Roldeck dicht relais
+    id: roldeck_close_relay
+    internal: true
+    restore_mode: ALWAYS_OFF
+    interlock: [roldeck_open_relay]
+    interlock_wait_time: 500ms
+    pin:
+      pca9554: TCA9554_hub
+      number: 5
+      mode:
+        output: true
+      inverted: false
+
+cover:
+  # Template cover exposes open/close/stop controls while the relays remain internal dry contacts.
+  - platform: template
+    name: Roldeck
+    icon: mdi:window-shutter
+    id: roldeck
+    assumed_state: true
+    optimistic: true
+    open_action:
+      - script.execute: roldeck_open
+    close_action:
+      - script.execute: roldeck_close
+    stop_action:
+      - script.execute: roldeck_stop
+
+script:
+  # Push several display refreshes shortly after boot so initial values appear quickly.
+  - id: nextion_boot_refresh
+    mode: restart
+    then:
+      - script.execute: update_nextion_display
+      - delay: 1s
+      - script.execute: update_nextion_display
+      - delay: 2s
+      - script.execute: update_nextion_display
+      - delay: 2s
+      - script.execute: update_nextion_display
+
+  # Send the current local controller state to the Nextion text fields and button labels.
+  - id: update_nextion_display
+    mode: restart
+    then:
+      - lambda: |-
+          const bool temp_ok = !isnan(id(pool_water_temperature).state);
+          if (temp_ok) {
+            id(pool_nextion).set_component_text_printf("tTemp", "%.1f \260C", id(pool_water_temperature).state);
+          } else {
+            id(pool_nextion).set_component_text("tTemp", "--.- \260C");
+          }
+
+          auto now = id(rtc_time).now();
+          if (now.is_valid()) {
+            id(pool_nextion).set_component_text_printf("tClock", "%02d:%02d", now.hour, now.minute);
+          } else {
+            id(pool_nextion).set_component_text("tClock", "--:--");
+          }
+          id(pool_nextion).set_component_text("tConn", id(api_client_connected) ? "Online" : "Local");
+
+          const uint16_t wifi_on = 50712;
+          const uint16_t wifi_dim = 16904;
+          const uint16_t wifi_bad = 63488;
+          const float rssi = id(wifi_signal_sensor).state;
+          if (isnan(rssi)) {
+            id(pool_nextion).set_component_background_color("wWifi1", wifi_bad);
+            id(pool_nextion).set_component_background_color("wWifi2", wifi_dim);
+            id(pool_nextion).set_component_background_color("wWifi3", wifi_dim);
+          } else if (rssi >= -60.0f) {
+            id(pool_nextion).set_component_background_color("wWifi1", wifi_on);
+            id(pool_nextion).set_component_background_color("wWifi2", wifi_on);
+            id(pool_nextion).set_component_background_color("wWifi3", wifi_on);
+          } else if (rssi >= -75.0f) {
+            id(pool_nextion).set_component_background_color("wWifi1", wifi_on);
+            id(pool_nextion).set_component_background_color("wWifi2", wifi_on);
+            id(pool_nextion).set_component_background_color("wWifi3", wifi_dim);
+          } else {
+            id(pool_nextion).set_component_background_color("wWifi1", wifi_on);
+            id(pool_nextion).set_component_background_color("wWifi2", wifi_dim);
+            id(pool_nextion).set_component_background_color("wWifi3", wifi_dim);
+          }
+
+          id(pool_nextion).set_component_text("tPump", id(pool_pump_relay).state ? "Draait" : "Uit");
+          if (id(pool_pump_stop_pending)) {
+            id(pool_nextion).set_component_text("tIon", "Naloop");
+          } else if (id(ionisator).state) {
+            id(pool_nextion).set_component_text("tIon", "Actief");
+          } else if (id(pool_pump_relay).state || id(ionisator_delayed_start).is_running()) {
+            id(pool_nextion).set_component_text("tIon", "Stand-by");
+          } else {
+            id(pool_nextion).set_component_text("tIon", "Uit");
+          }
+          id(pool_nextion).set_component_text("tLight", id(pool_light).state ? "Aan" : "Uit");
+          id(pool_nextion).set_component_text("tFill", id(water_fill).state ? "Vult bij" : "Uit");
+          id(pool_nextion).set_component_text("bFill", id(water_fill).state ? "STOP" : "START");
+          id(pool_nextion).set_component_text("tMode", id(pump_mode).current_option().c_str());
+
+          const int remaining = (int) id(water_fill_remaining_minutes).state;
+          if (id(water_fill).state) {
+            id(pool_nextion).set_component_text_printf("tFillTime", "Nog %d min", remaining);
+          } else {
+            id(pool_nextion).set_component_text("tFillTime", "");
+          }
+
+          if (id(roldeck_last_direction) == 1) {
+            id(pool_nextion).set_component_text("tCover", "Roldeck: open");
+          } else if (id(roldeck_last_direction) == -1) {
+            id(pool_nextion).set_component_text("tCover", "Roldeck: dicht");
+          } else {
+            id(pool_nextion).set_component_text("tCover", "Roldeck: stop");
+          }
+
+  # Manual pump start must immediately energize R01, even if the mode was already manual on.
+  - id: manual_pump_start
+    mode: restart
+    then:
+      - lambda: |-
+          ESP_LOGI("pool.pump", "Manual pump start: publishing mode and starting pump immediately");
+          id(pump_mode).publish_state("Handmatig aan");
+      - script.execute: pool_pump_start
+
+  # Manual pump stop publishes manual off and then uses the safe ionizer/pump stop sequence.
+  - id: manual_pump_stop
+    mode: restart
+    then:
+      - lambda: |-
+          ESP_LOGI("pool.pump", "Manual pump stop: publishing mode and stopping pump safely");
+          id(pump_mode).publish_state("Handmatig uit");
+      - script.execute: pool_pump_delayed_stop
+
+  # Apply the selected pump mode: manual on, manual off, or automatic schedule control.
+  - id: apply_pump_mode
+    mode: restart
+    then:
+      - lambda: |-
+          ESP_LOGI("pool.pump", "Pomp modus toepassen: %s", id(pump_mode).current_option().c_str());
+      - if:
+          condition:
+            lambda: return id(pump_mode).current_option() == "Handmatig aan";
+          then:
+            - script.execute: pool_pump_start
+          else:
+            - if:
+                condition:
+                  lambda: return id(pump_mode).current_option() == "Handmatig uit";
+                then:
+                  - script.execute: pool_pump_delayed_stop
+                else:
+                  - script.execute: enforce_pump_schedule
+
+  # Start the pump relay and arm the delayed ionizer start.
+  - id: pool_pump_start
+    mode: restart
+    then:
+      - lambda: |-
+          ESP_LOGI("pool.pump", "Pomp start: relais R01 aan, ionisator start over 1 minuut");
+      - lambda: id(pool_pump_stop_pending) = false;
+      - script.stop: pool_pump_delayed_stop
+      - switch.turn_on: pool_pump_relay
+      - script.execute: ionisator_delayed_start
+      - switch.template.publish:
+          id: pool_pump
+          state: ON
+      - script.execute: update_status_led
+      - script.execute: update_nextion_display
+      - script.execute: buzzer_action
+
+  # Update the local RGB status LED based on RTC, water fill, and pump state.
+  - id: update_status_led
+    mode: restart
+    then:
+      - if:
+          condition:
+            lambda: |-
+              auto now = id(rtc_time).now();
+              return !now.is_valid();
+          then:
+            - light.turn_on:
+                id: rgb_led
+                red: 100%
+                green: 0%
+                blue: 0%
+                brightness: 35%
+          else:
+            - if:
+                condition:
+                  switch.is_on: water_fill
+                then:
+                  - light.turn_on:
+                      id: rgb_led
+                      red: 100%
+                      green: 65%
+                      blue: 0%
+                      brightness: 35%
+                else:
+                  - if:
+                      condition:
+                        switch.is_on: pool_pump_relay
+                      then:
+                        - light.turn_on:
+                            id: rgb_led
+                            red: 0%
+                            green: 25%
+                            blue: 100%
+                            brightness: 35%
+                      else:
+                        - light.turn_on:
+                            id: rgb_led
+                            red: 0%
+                            green: 100%
+                            blue: 0%
+                            brightness: 25%
+
+  # Short boot confirmation tone, controlled by the sound enable switch.
+  - id: buzzer_boot
+    mode: restart
+    then:
+      - if:
+          condition:
+            switch.is_on: buzzer_enabled
+          then:
+            - rtttl.play:
+                id: rtttl_buzzer
+                rtttl: "boot:d=16,o=5,b=140:c6,g6,c7"
+
+  # Short action confirmation tone, controlled by the sound enable switch.
+  - id: buzzer_action
+    mode: restart
+    then:
+      - if:
+          condition:
+            switch.is_on: buzzer_enabled
+          then:
+            - rtttl.play:
+                id: rtttl_buzzer
+                rtttl: "action:d=16,o=5,b=180:c6,e6"
+
+  # Warning or completion tone, controlled by the sound enable switch.
+  - id: buzzer_warning
+    mode: restart
+    then:
+      - if:
+          condition:
+            switch.is_on: buzzer_enabled
+          then:
+            - rtttl.play:
+                id: rtttl_buzzer
+                rtttl: "warning:d=8,o=5,b=120:c6,p,c6"
+
+  # Evaluate the pump schedule and reconcile it with manual overrides.
+  - id: enforce_pump_schedule
+    mode: restart
+    then:
+      - lambda: |-
+          ESP_LOGD("pool.pump", "Schema controle gestart; modus=%s, schema=%s", id(pump_mode).current_option().c_str(), id(pump_auto_schedule).state ? "aan" : "uit");
+      - if:
+          condition:
+            lambda: |-
+              if (!id(pump_auto_schedule).state) {
+                ESP_LOGD("pool.pump", "Schema overgeslagen omdat automatisch schema uit staat");
+                id(pump_schedule_was_active) = false;
+                id(pump_schedule_start_edge) = false;
+                return false;
+              }
+              auto now = id(rtc_time).now();
+              if (!now.is_valid()) {
+                ESP_LOGW("pool.pump", "Schema overgeslagen omdat RTC-tijd ongeldig is");
+              }
+              return now.is_valid();
+          then:
+            - if:
+                condition:
+                  lambda: |-
+                    auto now = id(rtc_time).now();
+                    const int current = now.hour * 60 + now.minute;
+                    const auto start_time = id(pump_start_time).state_as_esptime();
+                    const auto stop_time = id(pump_stop_time).state_as_esptime();
+                    const int start = start_time.hour * 60 + start_time.minute;
+                    const int stop = stop_time.hour * 60 + stop_time.minute;
+                    bool active = false;
+                    if (start == stop) {
+                      ESP_LOGW("pool.pump", "Schema start en stop zijn gelijk; pomp blijft uit");
+                    } else if (start < stop) {
+                      active = current >= start && current < stop;
+                      ESP_LOGD("pool.pump", "Schema venster %02d:%02d-%02d:%02d, nu %02d:%02d, actief=%s", start_time.hour, start_time.minute, stop_time.hour, stop_time.minute, now.hour, now.minute, active ? "ja" : "nee");
+                    } else {
+                      active = current >= start || current < stop;
+                      ESP_LOGD("pool.pump", "Schema nachtvenster %02d:%02d-%02d:%02d, nu %02d:%02d, actief=%s", start_time.hour, start_time.minute, stop_time.hour, stop_time.minute, now.hour, now.minute, active ? "ja" : "nee");
+                    }
+                    id(pump_schedule_start_edge) = active && !id(pump_schedule_was_active);
+                    id(pump_schedule_was_active) = active;
+                    if (id(pump_schedule_start_edge)) {
+                      ESP_LOGI("pool.pump", "Nieuwe geplande start gedetecteerd");
+                    }
+                    return active;
+                then:
+                  - if:
+                      condition:
+                        and:
+                          - lambda: return id(pump_mode).current_option() == "Handmatig uit";
+                          - lambda: return !id(pump_schedule_start_edge);
+                      then:
+                        - lambda: |-
+                            ESP_LOGI("pool.pump", "Schema actief, maar pomp blijft uit door handmatige stop in dit schema-venster");
+                      else:
+                        - if:
+                            condition:
+                              switch.is_off: pool_pump_relay
+                            then:
+                              - lambda: |-
+                                  if (id(pump_schedule_start_edge) && id(pump_mode).current_option() == "Handmatig uit") {
+                                    ESP_LOGI("pool.pump", "Handmatige stop vervallen: nieuwe geplande start wint");
+                                    id(pump_mode).publish_state("Automatisch");
+                                  }
+                              - script.execute: pool_pump_start
+                            else:
+                              - lambda: |-
+                                  ESP_LOGD("pool.pump", "Schema vraagt pomp aan; pomp draait al");
+                else:
+                  - if:
+                      condition:
+                        lambda: return id(pump_mode).current_option() == "Handmatig aan";
+                      then:
+                        - lambda: |-
+                            ESP_LOGD("pool.pump", "Schema vraagt pomp uit, maar handmatige pompstart blijft actief");
+                      else:
+                        - if:
+                            condition:
+                              or:
+                                - switch.is_on: pool_pump_relay
+                                - script.is_running: ionisator_delayed_start
+                            then:
+                              - lambda: |-
+                                  ESP_LOGI("pool.pump", "Schema vraagt pomp uit");
+                              - script.execute: pool_pump_delayed_stop
+                            else:
+                              - lambda: |-
+                                  ESP_LOGD("pool.pump", "Schema vraagt pomp uit; pomp is al uit");
+
+  # Stop the pump safely: stop pending ionizer starts, turn off the ionizer first, then stop the pump.
+  - id: pool_pump_delayed_stop
+    mode: restart
+    then:
+      - lambda: |-
+          ESP_LOGI("pool.pump", "Pomp stop gestart: ionisator uit, pomp naloop indien nodig");
+      - lambda: id(pool_pump_stop_pending) = true;
+      - script.stop: ionisator_delayed_start
+      - if:
+          condition:
+            switch.is_on: ionisator
+          then:
+            - lambda: |-
+                ESP_LOGI("pool.ionisator", "Ionisator uit; pomp blijft nog 30 seconden draaien");
+            - switch.turn_off: ionisator
+            - delay: 30s
+          else:
+            - lambda: |-
+                ESP_LOGD("pool.ionisator", "Ionisator was al uit; pomp stopt zonder naloop");
+      - switch.turn_off: pool_pump_relay
+      - switch.template.publish:
+          id: pool_pump
+          state: OFF
+      - lambda: id(pool_pump_stop_pending) = false;
+      - script.execute: update_status_led
+      - script.execute: update_nextion_display
+      - script.execute: buzzer_action
+
+  # Wait one minute after pump start before enabling the ionizer, unless the pump stops first.
+  - id: ionisator_delayed_start
+    mode: single
+    then:
+      - lambda: |-
+          ESP_LOGI("pool.ionisator", "Ionisator starttimer gestart: 1 minuut wachten");
+      - delay: 1min
+      - if:
+          condition:
+            lambda: return id(pool_pump_relay).state && !id(pool_pump_stop_pending);
+          then:
+            - lambda: |-
+                ESP_LOGI("pool.ionisator", "Ionisator aan na 1 minuut pompbedrijf");
+            - switch.turn_on: ionisator
+            - script.execute: update_nextion_display
+          else:
+            - lambda: |-
+                ESP_LOGW("pool.ionisator", "Ionisator start geannuleerd: pomp uit of pompstop bezig");
+
+  # Automatically stop water filling after the configured safety timeout.
+  - id: water_fill_auto_stop
+    mode: restart
+    then:
+      - lambda: |-
+          const uint32_t now = millis();
+          const uint32_t end = id(water_fill_end_millis);
+          const uint32_t remaining_ms = ((int32_t) (end - now) > 0) ? (end - now) : 0;
+          ESP_LOGI("pool.waterfill", "Watervulling autotimer gestart: stopt over %lu minuten", (remaining_ms + 59999UL) / 60000UL);
+      - delay: !lambda |-
+          const uint32_t now = millis();
+          const uint32_t end = id(water_fill_end_millis);
+          if ((int32_t) (end - now) <= 0) {
+            return (uint32_t) 0;
+          }
+          return end - now;
+      - lambda: |-
+          ESP_LOGI("pool.waterfill", "Watervulling autotimer verlopen; watervulling uit");
+      - switch.turn_off: water_fill
+
+  # Pulse the dry contact that commands the pool cover to open.
+  - id: roldeck_open
+    mode: restart
+    then:
+      - lambda: |-
+          ESP_LOGI("pool.roldeck", "Roldeck open puls op R05");
+      - script.execute: buzzer_action
+      - switch.turn_off: roldeck_close_relay
+      - delay: 500ms
+      - switch.turn_on: roldeck_open_relay
+      - lambda: "id(roldeck_last_direction) = 1;"
+      - delay: 1s
+      - switch.turn_off: roldeck_open_relay
+      - script.execute: update_nextion_display
+
+  # Pulse the dry contact that commands the pool cover to close.
+  - id: roldeck_close
+    mode: restart
+    then:
+      - lambda: |-
+          ESP_LOGI("pool.roldeck", "Roldeck dicht puls op R06");
+      - script.execute: buzzer_action
+      - switch.turn_off: roldeck_open_relay
+      - delay: 500ms
+      - switch.turn_on: roldeck_close_relay
+      - lambda: "id(roldeck_last_direction) = -1;"
+      - delay: 1s
+      - switch.turn_off: roldeck_close_relay
+      - script.execute: update_nextion_display
+
+  # Stop the pool cover by pulsing the opposite direction based on the last command.
+  - id: roldeck_stop
+    mode: restart
+    then:
+      - lambda: |-
+          ESP_LOGI("pool.roldeck", "Roldeck stop; laatste richting=%d", id(roldeck_last_direction));
+      - script.execute: buzzer_action
+      - switch.turn_off: roldeck_open_relay
+      - switch.turn_off: roldeck_close_relay
+      - if:
+          condition:
+            lambda: "return id(roldeck_last_direction) == 1;"
+          then:
+            - delay: 500ms
+            - switch.turn_on: roldeck_close_relay
+            - delay: 1s
+            - switch.turn_off: roldeck_close_relay
+      - if:
+          condition:
+            lambda: "return id(roldeck_last_direction) == -1;"
+          then:
+            - delay: 500ms
+            - switch.turn_on: roldeck_open_relay
+            - delay: 1s
+            - switch.turn_off: roldeck_open_relay
+      - lambda: "id(roldeck_last_direction) = 0;"
+      - script.execute: update_nextion_display
+
+interval:
+  - interval: 60s
+    then:
+      - script.execute: enforce_pump_schedule
+      - script.execute: update_nextion_display
