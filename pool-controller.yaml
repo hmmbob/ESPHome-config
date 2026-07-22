@@ -31,17 +31,18 @@ packages:
   general_sensors: !include includes/general_sensors.yaml
 
 api:
+  id: pool_api
   on_client_connected:
     then:
       - lambda: |-
-          ESP_LOGI("pool.display", "API client connected");
-          id(api_client_connected) = true;
+          ESP_LOGI("pool.display", "API client connected: %s", client_info.c_str());
+      # Give Home Assistant time to subscribe to entity states before updating tConn.
+      - delay: 1s
       - script.execute: update_nextion_display
   on_client_disconnected:
     then:
       - lambda: |-
-          ESP_LOGI("pool.display", "API client disconnected");
-          id(api_client_connected) = false;
+          ESP_LOGI("pool.display", "API client disconnected: %s", client_info.c_str());
       - script.execute: update_nextion_display
 
 i2c:
@@ -103,6 +104,11 @@ light:
     icon: mdi:brightness-6
     id: nextion_backlight
     output: nextion_brightness_output
+    gamma_correct: 1.0
+    default_transition_length: 0s
+    initial_state:
+      state: true
+      brightness: 60%
     restore_mode: RESTORE_DEFAULT_ON
 
   - platform: esp32_rmt_led_strip
@@ -193,6 +199,7 @@ time:
         - script.execute: update_status_led
   - platform: pcf85063
     id: rtc_time
+    timezone: Europe/Amsterdam
 
 globals:
   # Runtime-only state used by scripts; these values are intentionally not restored after reboot.
@@ -217,11 +224,6 @@ globals:
     type: bool
     restore_value: false
     initial_value: "false"
-  - id: api_client_connected
-    type: bool
-    restore_value: false
-    initial_value: "false"
-
 number:
   # Water fill duration is stored locally and used by the ESP-side safety auto-stop.
   - platform: template
@@ -444,6 +446,8 @@ switch:
             - lambda: |-
                 ESP_LOGW("pool.ionisator", "Ionisator geblokkeerd: pomp uit of pompstop bezig");
             - switch.turn_off: ionisator
+    on_state:
+      - script.execute: update_nextion_display
 
   # R03: pool light
   - platform: gpio
@@ -457,6 +461,8 @@ switch:
       mode:
         output: true
       inverted: false
+    on_state:
+      - script.execute: update_nextion_display
 
   # R04: water-fill solenoid contactor
   - platform: gpio
@@ -571,7 +577,7 @@ script:
           } else {
             id(pool_nextion).set_component_text("tClock", "--:--");
           }
-          id(pool_nextion).set_component_text("tConn", id(api_client_connected) ? "Online" : "Local");
+          id(pool_nextion).set_component_text("tConn", id(pool_api).is_connected(true) ? "Online" : "Local");
 
           const uint16_t wifi_on = 50712;
           const uint16_t wifi_dim = 16904;
