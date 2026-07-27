@@ -45,6 +45,10 @@ api:
           ESP_LOGI("pool.display", "API client disconnected: %s", client_info.c_str());
       - script.execute: update_nextion_display
 
+# Bluetooth proxy
+bluetooth_proxy:
+esp32_ble_tracker:
+
 i2c:
   sda: GPIO42
   scl: GPIO41
@@ -55,10 +59,6 @@ i2c:
 pca9554:
   - id: TCA9554_hub
     address: 0x20
-
-# The Waveshare relays are labeled R01 through R08.
-# PCA9554 pin 0 maps to R01, pin 1 maps to R02, and so on through pin 7 = R08.
-# R07 and R08 are currently unused.
 
 one_wire:
   - platform: gpio
@@ -85,7 +85,7 @@ output:
           }
 
           id(pool_nextion).set_backlight_brightness(brightness);
-          ESP_LOGI("pool.display", "HA display brightness set to %.0f%%", brightness * 100.0f);
+          ESP_LOGI("pool.display", "Display brightness set to %.0f%%", brightness * 100.0f);
 
 rtttl:
   output: buzzer
@@ -224,6 +224,7 @@ globals:
     type: bool
     restore_value: false
     initial_value: "false"
+
 number:
   # Water fill duration is stored locally and used by the ESP-side safety auto-stop.
   - platform: template
@@ -300,6 +301,14 @@ select:
       - script.execute: apply_pump_mode
 
 sensor:
+  # ESP32-S3 die temperature; useful for controller diagnostics, not enclosure ambient temperature.
+  - platform: internal_temperature
+    name: Controller chiptemperatuur
+    icon: mdi:chip
+    id: controller_chip_temperature
+    entity_category: diagnostic
+    update_interval: 60s
+
   # Water temperature is sampled locally every 10 seconds; display updates run on each accepted sensor value.
   - platform: dallas_temp
     one_wire_id: pool_temperature_bus
@@ -333,33 +342,6 @@ sensor:
       return (float) ((remaining_ms + 59999UL) / 60000UL);
     filters:
       - delta: 1.0
-
-binary_sensor:
-  - platform: gpio
-    id: roldeck_open_input
-    name: Roldeck open knop
-    icon: mdi:arrow-up-bold-box
-    pin:
-      number: GPIO4
-      mode: INPUT_PULLUP
-      inverted: true
-    filters:
-      - delayed_on_off: 50ms
-    on_press:
-      - script.execute: roldeck_open
-
-  - platform: gpio
-    id: roldeck_close_input
-    name: Roldeck dicht knop
-    icon: mdi:arrow-down-bold-box
-    pin:
-      number: GPIO5
-      mode: INPUT_PULLUP
-      inverted: true
-    filters:
-      - delayed_on_off: 50ms
-    on_press:
-      - script.execute: roldeck_close
 
 switch:
   # User-facing pump switch maps to the pump mode instead of directly bypassing schedule logic.
@@ -412,6 +394,9 @@ switch:
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
 
+  # The Waveshare relays are labeled R01 through R08.
+  # PCA9554 pin 0 maps to R01, pin 1 maps to R02, and so on through pin 7 = R08.
+  # R05 and R06 are currently unused.
   # R01: filter pump
   - platform: gpio
     id: pool_pump_relay
@@ -497,7 +482,7 @@ switch:
       - script.execute: update_nextion_display
       - script.execute: buzzer_warning
 
-  # R05: pool cover open pulse, dry contact to the Starline RDEB 2006 controller.
+  # R07: pool cover open pulse, dry contact to the Starline RDEB 2006 controller.
   # - open: common terminal 2 to terminal 1
   # Do not connect external voltage here; the RDEB provides its own control circuit.
   - platform: gpio
@@ -509,12 +494,12 @@ switch:
     interlock_wait_time: 500ms
     pin:
       pca9554: TCA9554_hub
-      number: 4
+      number: 6
       mode:
         output: true
       inverted: false
 
-  # R06: pool cover close pulse, dry contact to the Starline RDEB 2006 controller.
+  # R08: pool cover close pulse, dry contact to the Starline RDEB 2006 controller.
   # - close: common terminal 2 to terminal 3
   # Do not connect external voltage here; the RDEB provides its own control circuit.
   - platform: gpio
@@ -526,7 +511,7 @@ switch:
     interlock_wait_time: 500ms
     pin:
       pca9554: TCA9554_hub
-      number: 5
+      number: 7
       mode:
         output: true
       inverted: false
@@ -577,7 +562,7 @@ script:
           } else {
             id(pool_nextion).set_component_text("tClock", "--:--");
           }
-          id(pool_nextion).set_component_text("tConn", id(pool_api).is_connected(true) ? "Online" : "Local");
+          id(pool_nextion).set_component_text("tConn", id(pool_api).is_connected_with_state_subscription() ? "Online" : "Local");
 
           const uint16_t wifi_on = 50712;
           const uint16_t wifi_dim = 16904;
@@ -930,7 +915,7 @@ script:
     mode: restart
     then:
       - lambda: |-
-          ESP_LOGI("pool.roldeck", "Roldeck open puls op R05");
+          ESP_LOGI("pool.roldeck", "Roldeck open puls op R07");
       - script.execute: buzzer_action
       - switch.turn_off: roldeck_close_relay
       - delay: 500ms
@@ -945,7 +930,7 @@ script:
     mode: restart
     then:
       - lambda: |-
-          ESP_LOGI("pool.roldeck", "Roldeck dicht puls op R06");
+          ESP_LOGI("pool.roldeck", "Roldeck dicht puls op R08");
       - script.execute: buzzer_action
       - switch.turn_off: roldeck_open_relay
       - delay: 500ms
