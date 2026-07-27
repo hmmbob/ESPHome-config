@@ -136,6 +136,7 @@ display:
             ESP_LOGI("pool.display", "Nextion display verbonden");
             id(pool_nextion).set_component_text("tTitle", "Pool Controller");
             id(pool_nextion).set_component_text("tMsg", "Display online");
+        - script.execute: apply_display_brightness
         - script.execute: nextion_boot_refresh
     on_touch:
       then:
@@ -145,6 +146,7 @@ display:
             condition:
               lambda: return touch_event;
             then:
+              - script.execute: display_wake
               - lambda: |-
                   switch (component_id) {
                     case 14:
@@ -180,7 +182,6 @@ display:
                       id(roldeck_close).execute();
                       break;
                     default:
-                      id(pool_nextion).set_component_text_printf("tMsg", "Touch %d", component_id);
                       break;
                   }
         - script.execute: update_nextion_display
@@ -197,9 +198,21 @@ time:
         - pcf85063.write_time:
         - script.execute: enforce_pump_schedule
         - script.execute: update_status_led
+        - script.execute: apply_display_brightness
   - platform: pcf85063
     id: rtc_time
     timezone: Europe/Amsterdam
+    on_time:
+      - seconds: 0
+        minutes: 0
+        hours: 7
+        then:
+          - script.execute: apply_display_brightness
+      - seconds: 0
+        minutes: 0
+        hours: 22
+        then:
+          - script.execute: apply_display_brightness
 
 globals:
   # Runtime-only state used by scripts; these values are intentionally not restored after reboot.
@@ -211,7 +224,10 @@ globals:
     type: uint32_t
     restore_value: false
     initial_value: "0"
-
+  - id: display_wake_active
+    type: bool
+    restore_value: false
+    initial_value: "false"
   - id: pool_pump_stop_pending
     type: bool
     restore_value: false
@@ -520,7 +536,7 @@ cover:
   # Template cover exposes open/close/stop controls while the relays remain internal dry contacts.
   - platform: template
     name: Roldeck
-    icon: mdi:window-shutter
+    device_class: shutter
     id: roldeck
     assumed_state: true
     optimistic: true
@@ -532,6 +548,43 @@ cover:
       - script.execute: roldeck_stop
 
 script:
+  # Apply the local time-based display brightness unless a touch wake period is active.
+  - id: apply_display_brightness
+    mode: restart
+    then:
+      - if:
+          condition:
+            lambda: return id(display_wake_active);
+          then:
+            - lambda: |-
+                ESP_LOGD("pool.display", "Tijdstand uitgesteld: display is tijdelijk actief na aanraking");
+          else:
+            - if:
+                condition:
+                  lambda: |-
+                    auto now = id(rtc_time).now();
+                    return !now.is_valid() || (now.hour >= 7 && now.hour < 22);
+                then:
+                  - light.turn_on:
+                      id: nextion_backlight
+                      brightness: 60%
+                else:
+                  - light.turn_on:
+                      id: nextion_backlight
+                      brightness: 1%
+
+  # Wake the display for one minute; each new touch restarts this timer.
+  - id: display_wake
+    mode: restart
+    then:
+      - lambda: id(display_wake_active) = true;
+      - light.turn_on:
+          id: nextion_backlight
+          brightness: 60%
+      - delay: 1min
+      - lambda: id(display_wake_active) = false;
+      - script.execute: apply_display_brightness
+
   # Push several display refreshes shortly after boot so initial values appear quickly.
   - id: nextion_boot_refresh
     mode: restart
