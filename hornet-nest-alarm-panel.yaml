@@ -91,6 +91,10 @@ ethernet:
       value: 0x1ffa
       page_id: 0x7
 
+# Bluetooth proxy
+bluetooth_proxy:
+esp32_ble_tracker:
+
 # Initialize the I2C Bus
 i2c:
   sda:

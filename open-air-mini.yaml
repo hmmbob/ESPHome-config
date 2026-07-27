@@ -20,6 +20,10 @@ packages:
   general_settings: !include includes/general_settings.yaml
   general_sensors: !include includes/general_sensors.yaml
 
+# Bluetooth proxy
+bluetooth_proxy:
+esp32_ble_tracker:
+
 globals:
   - id: disconnected_default_fan_speed
     type: int
