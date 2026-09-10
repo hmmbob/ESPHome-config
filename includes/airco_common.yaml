@@ -19,7 +19,7 @@ logger:
 external_components:
   - source: github://ginkage/MHI-AC-Ctrl-ESPHome@master
     components: [MhiAcCtrl]
-    refresh: 0s
+    refresh: 1h
 
 MhiAcCtrl:
   external_temperature_sensor: room_temperature_sensor
