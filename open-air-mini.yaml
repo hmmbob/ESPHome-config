@@ -33,7 +33,9 @@ globals:
 uart:
   #UART For Sensor 1
   - rx_pin: GPIO13
-    tx_pin: GPIO12
+    tx_pin:
+      number: GPIO12
+      ignore_strapping_warning: true
     baud_rate: 9600
     id: uart_sensor_1
   #UART For Sensor 2
@@ -64,8 +66,10 @@ status_led:
 #PWM output for controlling the motor.
 output:
   - platform: ledc
-    pin: GPIO15
-    inverted: true
+    pin:
+      number: GPIO15
+      inverted: true
+      ignore_strapping_warning: true
     id: open_air_mini
 
 fan:
