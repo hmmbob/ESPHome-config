@@ -66,8 +66,8 @@ sensor:
           condition:
             - lambda: "return id(last_keypress).state == 11;"
           then:
-            - homeassistant.service:
-                service: button.press
+            - homeassistant.action:
+                action: button.press
                 data:
                   entity_id: button.all_knx_switches
 
