@@ -21,9 +21,6 @@ packages:
 ################ Remove components ################
 captive_portal: !remove
 
-ota:
-  - id: !remove web_server_ota
-
 web_server: !remove
 
 wifi:

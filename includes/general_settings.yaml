@@ -17,8 +17,7 @@ api:
 
 ota:
   - platform: esphome
-  - platform: web_server
-    id: web_server_ota
+    password: !secret webserver_password
 
 time:
   - platform: homeassistant
@@ -36,3 +35,7 @@ button:
     entity_category: diagnostic
 
 web_server:
+  auth:
+    username: !secret webserver_user
+    password: !secret webserver_password
+    type: digest
