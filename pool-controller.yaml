@@ -115,7 +115,7 @@ light:
     name: Status LED
     id: rgb_led
     internal: true
-    rgb_order: RGB
+    channel_colors: RGB
     chipset: WS2812
     pin: GPIO38
     num_leds: 1
