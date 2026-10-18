@@ -30,8 +30,12 @@ api:
   reboot_timeout: 0s
   actions:
     - action: set_external_room_temperature
+      description: "Geef de airco een externe kamertemperatuur door."
       variables:
-        temperature_value: float # temperature to set in Celsius
+        temperature_value:
+          type: float # temperature to set in Celsius
+          description: "Gemeten kamertemperatuur in graden Celsius."
+          example: "21.5"
       then:
         - climate.mhi.set_external_room_temperature:
             temperature: !lambda "return temperature_value;"

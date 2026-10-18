@@ -43,8 +43,12 @@ api:
   # esphome.waterlezer_set_water_reading en daarmee de beginstand invoeren.
   actions:
     - action: set_water_reading
+      description: "Stel de totale watermeterstand in."
       variables:
-        meter_value: int
+        meter_value:
+          type: int
+          description: "Totale meterstand in hele liters."
+          example: "123456"
       then:
         - pulse_counter.set_total_pulses:
             id: watermeter_pulse

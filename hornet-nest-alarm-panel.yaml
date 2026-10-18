@@ -53,8 +53,12 @@ api:
     key: !secret api_key
   actions:
     - action: play_rtttl
+      description: "Speel een melodie af via de zoemer."
       variables:
-        song_str: string
+        song_str:
+          type: string
+          description: "Melodie in RTTTL-notatie."
+          example: "piep:d=8,o=5,b=120:c"
       then:
         - rtttl.play: !lambda "return song_str;"
 
